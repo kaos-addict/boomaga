@@ -12,19 +12,29 @@
 #           download and/or create basic commented files in ./appname folder.
 # _If repo exists:
 #           Clone existing KCP repo and open files & proto files for editing 
-mkpkg() {
+
 # Be sure we don't run fancy ls and grep
     alias ls=/usr/bin/ls
     alias grep=/usr/bin/grep
     repo_name=""
     
+#### Functions ####
+# Detect valid url
+isurl() {
+if [ -n "$(echo ${1} | grep "http://\|https://\|git@" )" ];then
+    echo yes && exit 0
+else echo no && exit 1
+fi
+}
+#### /Functions ####
+
 # If no default XEDITOR then use kate
     [ -z "$XEDITOR" ] && XEDITOR=/usr/bin/kate
     input=$@
 
 # Arg given
     if [ -n "${input}" ];then
-        if [ "$(isurl "${input}")" = "yes" ];then
+        if [ $(isurl "${input}") = "yes" ];then
         
 # Supports github repo as input
             if [ -n "$(echo "${input}" | grep github.com)" ];then
@@ -51,23 +61,23 @@ mkpkg() {
 
 # Detect kcp address, or same user, clone repo & edit files, close this script
                 if [ "${repo_auth}" = "KaOS-Community-Packages" ] || [ "${repo_auth}" = "$(git config github.user)" ];then
-                    git clone ${repo_url} && cd ${repo_name} && $XEDITOR -n README.md PKGBUILD & return 0
+                    git clone ${repo_url} && cd ${repo_name} && $XEDITOR -n README.md PKGBUILD & exit 0
 
-                else git clone ${repo_url} && cd ${repo_name} && initgithub ${repo_name} && $XEDITOR -n README.md PKGBUILD && return 0 || { 
+                else git clone ${repo_url} && cd ${repo_name} && initgithub ${repo_name} && $XEDITOR -n README.md PKGBUILD && exit 0 || { 
                     kdialog --error "Unable to clone given repo, is a folder named ${repo_name} exists?" 
-                    return 1
+                    exit 1
                     }
                 fi
             else kdialog --title="$FUNCNAME" --error "Github.com repo not detected but url detected repo from outside github not supported for now..."
-                return 1
+                exit 1
             fi
             
 # Arg is not an url, create new empty repo
-        elif [ ! -z ${input} ] && repo_name=${input} && [ ! -d ${repo_name} ];then
-            if [ -n "$(echo ${input} | grep '/')" ];then
+        elif [ -n "${input}" ]  && [ ! -d ${input}} ];then
+            if [ -n "$(echo ${input} | grep ':/')" ];then
                 kdialog --error "Protocol not supported or bad argument"
-                return 1
-            else initgithub $1 || return 1
+                exit 1
+            else initgithub $1 || exit 1
             
 # Get PKGBUILD proto file (hopefully pckcp takes care of this for us:)
                 pckcp -g${c} && sed -i "s/PKGNAME/${repo_name}/g" PKGBUILD
@@ -76,16 +86,15 @@ mkpkg() {
                 wget ${g_raw}/kaos-addict/kaos-helpers/master/README.md${_com}.kaos.proto -O README.md
                 sed -i "s/# PKGNAME/# ${repo_name}/" README.md
                 kate -n README.md PKGBUILD & disown            
-                return 0
+                exit 0
             fi
 
 # Arg not detected
         else kdialog --error "Unable to evaluate argument"
-            return 1
+            exit 1
         fi
         
 # No arg given
     else kdialog --error "No arg given or ${repo_name} folder exists, exiting..."
-        return 1
+        exit 1
     fi
-}

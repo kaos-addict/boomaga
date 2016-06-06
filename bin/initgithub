@@ -20,7 +20,7 @@
     if [ "${repo_name}" = "" ]; then
         while [ -z "${repo_name}" ];do
             repo_name="$(${_entry} "Repository name to create?" "")"
-            [ "$?" != "0" ] && return 1
+            [ "$?" != "0" ] && exit 1
         done
     fi
 
@@ -28,36 +28,30 @@
     user_name=`git config github.user`
     if [ "${user_name}" = "" ]; then
         ${_error} "Could not find username, to create one, run 'git config --global github.user <username>'"
-        return 1
+        exit 1
     fi
 
 # Get github token
-    token=`git config github.token`
-    if [ "${g_token}" = "" ]; then
+    token=$(git config github.token)
+    if [ "${token}" = "" ]; then
         ${_error} "Could not find token, run 'git config --global github.token <token>'"
-        return 1
+        exit 1
     fi
     
-    if [ "$(basename $PWD)" = "${repo_name}" ];then
-        if [ "$(curl -u "${user_name}:${g_token}" https://api.github.com/user/repos -d '{"name":"'${repo_name}'"}' | grep "Validation Failed")" ];then
-            kdialog --error "Unable to create repo ${repo_name} for user ${user_name}" # Should be fifo to get output in xdialog
-            return 1
-        fi
-    else mkdir ${repo_name} && cd ${repo_name} || { 
-        kdialog --error "Unable to change directory to ${repo_name}"
-        return 1 
-        }
-        if [ "$(curl -u "${user_name}:${g_token}" https://api.github.com/user/repos -d '{"name":"'${repo_name}'"}' | grep "Validation Failed")" ];then
-            kdialog --error "Unable to create repo ${repo_name} for user ${user_name}" # Should be fifo to get output in xdialog
-            return 1
-        fi
-    fi
+mkdir ${repo_name} && cd ${repo_name} || { 
+kdialog --error "Unable to change directory to ${repo_name}"
+exit 1 
+}
+if [ "$(curl -u "${user_name}:${g_token}" https://api.github.com/user/repos -d '{"name":"'${repo_name}'"}' | grep "Validation Failed")" ];then
+        kdialog --error "Unable to create repo ${repo_name} for user ${user_name}" # Should be fifo to get output in xdialog
+        exit 1
+fi
 
 # Add remote origin or init repo
     git remote remove origin || git init >/dev/null 2>&1
     git remote add origin git@github.com:${user_name}/${repo_name}.git || { 
         kdialog --error "Unable to create repo at git@github.com:${user_name}/${repo_name}.git"
-        return 1
+        exit 1
         }
     if [ -z "$(ls)" ];then
         touch Readme.md
@@ -65,23 +59,23 @@
 # Add Readme.md file to git
         git add Readme.md || { 
             kdialog --error "Unable add Readme.md file to git"
-            return 1
+            exit 1
             }
 
 # First commit
         git commit -m "Initial commit from mkpkg" || { 
             kdialog --error "Unable to first commit to git@github.com:${user_name}/${repo_name}.git"
-            return 1
+            exit 1
             }
     fi
 
 # First push
     git push -u origin master || {
         kdialog --error "Unable to push repo to git@github.com:${user_name}/${repo_name}.git"
-        return 1
+        exit 1
         }
         
     kdialog --yesno "Code pushed to remote. \nYour newly created git repository can be found at: \nhttps://github.com/${repo_name}\nClick 'Next' to create basic files."
-    [ "$?" = "0" ] && return 0
+    [ "$?" = "0" ] && exit 0
     export repo_name=${repo_name}
     
