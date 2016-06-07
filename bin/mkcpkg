@@ -46,6 +46,15 @@ Get_work_dir() {
         Work_dir=""
     fi
 }
+
+get_repo() {
+    if [ -d ${Work_dir}/${repo_name} ];then
+        cd ${Work_dir}/${repo_name}/ && git pull && $XEDITOR -n README.md PKGBUILD 2>>/dev/null&& return 0
+    else git clone ${repo_url} && cd ${repo_name} && $XEDITOR -n README.md PKGBUILD 2>>/dev/null && return 0
+    fi
+    return 1
+}
+
 #### /Functions ####
 
 #### Main Script ####
@@ -60,7 +69,7 @@ do
 done
 
 # If no default XEDITOR then use kate
-[ -z "$XEDITOR" ] && XEDITOR="/usr/bin/kate"
+[ -z "$XEDITOR" ] && XEDITOR=$(which kate || _errorexit "Can't find either kate nor XEDITOR variable...\nYou can add it in your bashrc as: \"export XEDITOR=/usr/bin/yourtexteditor\" ...\nExiting" 1)
 
 # Ask for usual working folder or a new one
 kdialog --warningyesno "Your KCP contribution folder is set to: \"${Work_dir}\".\nSelect \"Choose\" if you want to change it..." --yes-label "Choose" --no-label "Yes"
@@ -72,11 +81,32 @@ fi
 # Arg given
 if [ -n "${input}" ];then
 
-### TODO: detect url to update pkg instead of creating a new one
+# Is input an Url
     if [ "$(isurl \"${input}\")" = "yes" ];then
-        _errorexit "${input} is Url...\This is not yet implemented... Exiting..." 1
+#        _errorexit "${input} is Url...\This is not yet implemented... Exiting..." 1
+
+# Supports github repo as input
+        if [ -n "$(echo "${input}" | grep "git@github.com:${Org}/")" ];then
+
+# Url is ssh
+# Extract repo_name from url
+            repo_name=`basename "$(echo ${input} | cut -d '/' -f 2)" .git`
+            repo_url=${input}
+            get_repo
+            
+# Url is https
+        elif [ -n "$(echo ${input} | grep "https://github.com/${Org}" )" ];then
+        
+# Extract repo_name from url
+            repo_name=`basename $(echo ${input} | sed "s#https://github.com/${Org}/##") .git`
+            get_repo || _errorexit "Unable to clone and edit given repo, is a folder named '${repo_name}' existing?" 1
+        fi
+        
+    else _errorexit "Url detected but...\nNon-github repositories are not (yet) supported..." 1
+    fi
+
 # Arg is not an url, create new empty repo
-    elif [ -d "${Work_dir}/${input}" ];then
+    if [ -d "${Work_dir}/${input}" ];then
         kdialog --warningyesno "Folder exists, pull repo to ${input} folder?"
         if [ "$?" = "0" ];then cd ${Work_dir}/${input} && git pull && exit 0 || exit 1
         else exit 1
@@ -89,7 +119,7 @@ if [ -n "${input}" ];then
 # Get README proto file
             wget ${g_raw}/kaos-addict/kaos-helpers/master/README.md${_com}.kaos.proto -O README.md
             sed -i "s/# PKGNAME/# ${repo_name}/" README.md
-            ${XEDITOR} -n README.md PKGBUILD & disown            
+            ${XEDITOR} -n README.md PKGBUILD & disown 2>>/dev/null       
             exit 0
         elif [ "$?" = "123" ];then
             kdialog --msgbox "Repository ${repo_name} at https://github.com/${Org}/${repo_name} created.\nFeel free now to commit and then push your working folder: '${Work_dir}/${repo_name}'."
