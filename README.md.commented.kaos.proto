@@ -25,7 +25,7 @@ UNCATEGORIZED
 ; Here indicate package website if any. Add more with something 
 ; like '**Repository**: URL' '**Other-link**: URL' etc... One per line
 ; But only first one should be required and should be the same as ${url}
-####Website: 
+#### Website: 
 URL
 
 ; From here everything is optional and should be use when needed/required
@@ -42,7 +42,7 @@ First run kcp in dependance mode with:
     * `kcp -di DEPNAME`
     * `kcp -di NEXTDEPNAME`
 ```
-; Next part is unruled and is only human oriented:
+; Next part is unruled, optionnal and is only human oriented:
 Then you will be able to run:
 
     * kcp -i PKGNAME
@@ -60,7 +60,7 @@ Then you will be able to run:
 ;```
 ;    
 ;```
-#### Changelog
+##### Changelog
 HTTP://CHANGELOG.URL
 
 ; Optionaly again, add a screenshot
@@ -68,7 +68,7 @@ HTTP://CHANGELOG.URL
 ;The screenshot's url also can be remote, like the next example:
 ;![PKGNAME](http://www.parlonsgeek.com/Visual-Studio-Code.png")
 
-#### Screenshot
+##### Screenshot
 ![PKGNAME](images/screenshots/screenshot.png)
 
 ; All above rules respected you can add anything to this document without compromising parsing.

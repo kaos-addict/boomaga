@@ -1,0 +1,102 @@
+#!/bin/bash
+# Create new kcp package repo and basics files TODO: recognize url?
+# Use like: mkpkg <sourcesurl>
+#           mkpkg <appname>
+#
+# Where <sourceurl> is a github repo address or a source tarball
+# And <appname> is just the name of an app you would like to create a pkg for
+#
+# It will: 
+# _If repo not existing: 
+#           Create a new repo for appname in KCP, using initgithub
+#           download and/or create basic commented files in ./appname folder.
+# _If repo exists:
+#           Clone existing KCP repo and open files & proto files for editing 
+
+#### VARIABLES: ####
+repo_name=""
+input="$1"
+rc_file="/home/$USER/.config/mkcpkgrc"
+Org=KaOS-Community-Packages
+#### /VARIABLES: ####
+
+#### Functions ####
+# Simple exit with error message
+_errorexit() {
+        kdialog --error $1 
+        exit $2
+}
+
+# Detect valid url
+isurl() {
+if [ -n "$(echo ${1} | grep "http://\|https://\|git@" )" ];then
+    echo yes && exit 0
+else echo no && exit 1
+fi
+}
+
+# Get working directory
+Get_work_dir() {
+    work_dir="$(kdialog --getexistingdirectory "/home/$USER/kcp" 2>>/dev/null)"
+    echo "Work_dir=${work_dir}" > ${rc_file} 
+    source ${rc_file}
+    kdialog --warningcontinuecancel "Your KCP contributions folder is: \"${Work_dir}\".\nClick cancel to select another one."
+    if [ $? != 0 ];then
+        echo "Work_dir=''" >${rc_file}
+        Work_dir=""
+    fi
+}
+#### /Functions ####
+
+#### Main Script ####
+#  If you already have a folder containing your KCP contributions you can configure it in ~/.config/mkcpkgrc
+[ -f ${rc_file} ] && source ${rc_file}
+
+# Get working directory or ask for it:
+while [ -z "${Work_dir}" ]
+do
+    kdialog --warningcontinuecancel "KCP contib folder not set.\nPlease select your KCP contributions folder..." || exit 1
+    Get_work_dir
+done
+
+# If no default XEDITOR then use kate
+[ -z "$XEDITOR" ] && XEDITOR="/usr/bin/kate"
+
+# Ask for usual working folder or a new one
+kdialog --warningyesno "Your KCP contribution folder is set to: \"${Work_dir}\".\nSelect \"Choose\" if you want to change it..." --yes-label "Choose" --no-label "Yes"
+if [ "$?" = "0" ];then
+    Work_dir=""
+    Get_work_dir
+fi
+
+# Arg given
+if [ -n "${input}" ];then
+
+### TODO: detect url to update pkg instead of creating a new one
+    if [ "$(isurl \"${input}\")" = "yes" ];then
+        _errorexit "${input} is Url...\This is not yet implemented... Exiting..." 1
+# Arg is not an url, create new empty repo
+    elif [ -d "${Work_dir}/${input}" ];then
+        kdialog --warningyesno "Folder exists, pull repo to ${input} folder?"
+        if [ "$?" = "0" ];then cd ${Work_dir}/${input} && git pull && exit 0 || exit 1
+        else exit 1
+        fi
+    else bash -x /usr/local/bin/initgithub "${input}" 
+        if [ "$?" = "0" ];then 
+# Get PKGBUILD proto file (hopefully pckcp takes care of this for us:)
+            pckcp -g${c} && sed -i "s/PKGNAME/${repo_name}/g" PKGBUILD
+            
+# Get README proto file
+            wget ${g_raw}/kaos-addict/kaos-helpers/master/README.md${_com}.kaos.proto -O README.md
+            sed -i "s/# PKGNAME/# ${repo_name}/" README.md
+            ${XEDITOR} -n README.md PKGBUILD & disown            
+            exit 0
+        elif [ "$?" = "123" ];then
+            kdialog --msgbox "Repository ${repo_name} at https://github.com/${Org}/${repo_name} created.\nFeel free now to commit and then push your working folder: '${Work_dir}/${repo_name}'."
+        else exit 1
+        fi
+    fi
+# Arg not detected
+else kdialog --error "Unable to evaluate argument or no valid argument given."
+        exit 1
+fi
