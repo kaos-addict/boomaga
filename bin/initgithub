@@ -1,21 +1,30 @@
 #!/bin/bash
 # Create new repo on github.com, can create empty repo, or push yours on github
 
-# Be sure we don't run fancy ls and grep
-    alias ls=/usr/bin/ls
-    alias grep=/usr/bin/grep
+rc_file="/home/$USER/.config/mkcpkgrc"
+repo_name=$1
+dir_name=`basename $(pwd)`
+g_hub="git@github.com"
+_com=".commented"
+c=${_com:1:1}
+Org=KaOS-Community-Packages
     
-    repo_name=$1
-    dir_name=`basename $(pwd)`
-    g_hub="git@github.com"
-    g_raw="https://raw.githubusercontent.com"
-    _com=".commented"
-    c=${_com:1:1}
+# X Dialogs functions and aliases
+_entry="kdialog --title=$0 --inputbox"
+_error="kdialog --title=$0 --error"
+_errorexit() {
+        kdialog --error "$1" 
+        exit $2
+}
     
-# X Dialogs functions
-    _entry="kdialog --title=$0 --inputbox"
-    _error="kdialog --error"
-    
+debug() {
+    echo "Repo Name: ${repo_name}
+User: ${user_name}
+Token: ${token}
+Pwd: $PWD
+Git Status: $(git status)"
+}
+
 # Verify arg or ask for repo name
     if [ "${repo_name}" = "" ]; then
         while [ -z "${repo_name}" ];do
@@ -26,56 +35,69 @@
 
 # Get credentials from git config
     user_name=`git config github.user`
-    if [ "${user_name}" = "" ]; then
-        ${_error} "Could not find username, to create one, run 'git config --global github.user <username>'"
+    if [ -z ${user_name} ]; then
+        kdialog --warningyesno "Could not find username from git config, should I try to configure it for you?" && user_name=$(kdialog --inputbox "Enter username you use on github (Must be member of Kaos-Community-Packages on github)" "User")
+        if [ -z ${user_name} ]; then
+        ${_error} "Could not find username, to create and use one from now, run 'git config --global github.user <username>'.\n"
         exit 1
+        fi
     fi
 
 # Get github token
     token=$(git config github.token)
-    if [ "${token}" = "" ]; then
-        ${_error} "Could not find token, run 'git config --global github.token <token>'"
-        exit 1
+    if [ -z ${token} ]; then
+         kdialog --warningyesno "Should I try to create you one?" 
+         if [ "$?" = "0" ];then
+            kdialog --inputbox "Enter username you want this token for (Must be member of Kaos-Community-Packages on github)" "User" || exit 1
+            ${_errorexit} "Could not find token, if you didn't created one yet,\nyou can do so at: 'https://github.com/settings/tokens'\nThen you will be able to run: 'git config --global github.token <token>'"
     fi
-    
-mkdir ${repo_name} && cd ${repo_name} || { 
-kdialog --error "Unable to change directory to ${repo_name}"
-exit 1 
-}
-if [ "$(curl -u "${user_name}:${g_token}" https://api.github.com/user/repos -d '{"name":"'${repo_name}'"}' | grep "Validation Failed")" ];then
-        kdialog --error "Unable to create repo ${repo_name} for user ${user_name}" # Should be fifo to get output in xdialog
-        exit 1
-fi
 
-# Add remote origin or init repo
-    git remote remove origin || git init >/dev/null 2>&1
-    git remote add origin git@github.com:${user_name}/${repo_name}.git || { 
-        kdialog --error "Unable to create repo at git@github.com:${user_name}/${repo_name}.git"
-        exit 1
-        }
-    if [ -z "$(ls)" ];then
-        touch Readme.md
-        
-# Add Readme.md file to git
-        git add Readme.md || { 
-            kdialog --error "Unable add Readme.md file to git"
-            exit 1
-            }
+# Source user config
+source ${rc_file} || _errorexit "Unable to source rc file" 1
+
+Init_folder() {
+    mkdir ${Work_dir}/${repo_name} && cd ${Work_dir}/${repo_name} || return 1
+}
+
+Create_repo() {
+curl -u ${user_name}:${token} https://api.github.com/orgs/${Org}/repos -d '{"name":"'${repo_name}'"}' > /tmp/github.${repo_name} 2>&1
+for err in "Bad credentials" "name already exists on this account"
+do
+    if [ -n "$(grep "'${err}'" /tmp/github.${repo_name})" ];then
+        echo "$(debug)" >> /tmp/github.${repo_name}
+        ${_error} "Unable to create repo ${repo_name} for user ${user_name}, have you valid credentials, or maybe this repo already exist?\nYou can look at /tmp/github.${repo_name} to find out more" # Should be fifo to get output in xdialog
+        return 1
+    fi
+done
+return 0
+}
+
+Init_repo() {
+repo_dir="$1"
+cd ${repo_dir} || _errorexit "Unable to create or change directory to ${repo_name}" 1
+
+# Init repo
+    git init
+    git remote add origin git@github.com:${Org}/${repo_name}.git ||  _errorexit "Unable to create repo at git@github.com:${Org}/${repo_name}.git" 1
+
+# Create basic files
+    touch README.md
+    touch PKGBUILD
+    
+# Add README.md file to git
+    git add README.md PKGBUILD || _errorexit "Unable add README.md file to git" 1
 
 # First commit
-        git commit -m "Initial commit from mkpkg" || { 
-            kdialog --error "Unable to first commit to git@github.com:${user_name}/${repo_name}.git"
-            exit 1
-            }
-    fi
+    git commit -m "Initial commit, created empty README.md and PKGBUILD files." || _errorexit "Unable to commit..." 1
+}
 
+Init_folder || _errorexit "Unable to create or change directory to ${repo_name}" 1
+[ -z "$(ls -A ./)" ] &&  Init_repo "${Work_dir}/${repo_name}"
+
+Create_repo || exit 1
 # First push
-    git push -u origin master || {
-        kdialog --error "Unable to push repo to git@github.com:${user_name}/${repo_name}.git"
-        exit 1
-        }
-        
-    kdialog --yesno "Code pushed to remote. \nYour newly created git repository can be found at: \nhttps://github.com/${repo_name}\nClick 'Next' to create basic files."
-    [ "$?" = "0" ] && exit 0
-    export repo_name=${repo_name}
+git push -u origin master >> /tmp/github.${repo_name} 2>&1 || _errorexit "Unable to push repo to git@github.com:${Org}/${repo_name}.git\nYou may find out more in '/tmp/github.${repo_name}'." 1
+
+kdialog --yesno "Code pushed to remote. \nYour newly created git repository can be found at: \nhttps://github.com/${Org}/${repo_name}\nClick 'Yes' to fill basic files for a kcp package."
+    [ "$?" = "0" ] && export repo_name="${repo_name}" && exit 0 || exit 123
     

@@ -13,12 +13,20 @@
 # _If repo exists:
 #           Clone existing KCP repo and open files & proto files for editing 
 
-# Be sure we don't run fancy ls and grep
-    alias ls=/usr/bin/ls
-    alias grep=/usr/bin/grep
-    repo_name=""
-    
+#### VARIABLES: ####
+repo_name=""
+input="$1"
+rc_file="/home/$USER/.config/mkcpkgrc"
+Org=KaOS-Community-Packages
+#### /VARIABLES: ####
+
 #### Functions ####
+# Simple exit with error message
+_errorexit() {
+        kdialog --error $1 
+        exit $2
+}
+
 # Detect valid url
 isurl() {
 if [ -n "$(echo ${1} | grep "http://\|https://\|git@" )" ];then
@@ -26,75 +34,69 @@ if [ -n "$(echo ${1} | grep "http://\|https://\|git@" )" ];then
 else echo no && exit 1
 fi
 }
+
+# Get working directory
+Get_work_dir() {
+    work_dir="$(kdialog --getexistingdirectory "/home/$USER/kcp" 2>>/dev/null)"
+    echo "Work_dir=${work_dir}" > ${rc_file} 
+    source ${rc_file}
+    kdialog --warningcontinuecancel "Your KCP contributions folder is: \"${Work_dir}\".\nClick cancel to select another one."
+    if [ $? != 0 ];then
+        echo "Work_dir=''" >${rc_file}
+        Work_dir=""
+    fi
+}
 #### /Functions ####
 
+#### Main Script ####
+#  If you already have a folder containing your KCP contributions you can configure it in ~/.config/mkcpkgrc
+[ -f ${rc_file} ] && source ${rc_file}
+
+# Get working directory or ask for it:
+while [ -z "${Work_dir}" ]
+do
+    kdialog --warningcontinuecancel "KCP contib folder not set.\nPlease select your KCP contributions folder..." || exit 1
+    Get_work_dir
+done
+
 # If no default XEDITOR then use kate
-    [ -z "$XEDITOR" ] && XEDITOR=/usr/bin/kate
-    input=$@
+[ -z "$XEDITOR" ] && XEDITOR="/usr/bin/kate"
+
+# Ask for usual working folder or a new one
+kdialog --warningyesno "Your KCP contribution folder is set to: \"${Work_dir}\".\nSelect \"Choose\" if you want to change it..." --yes-label "Choose" --no-label "Yes"
+if [ "$?" = "0" ];then
+    Work_dir=""
+    Get_work_dir
+fi
 
 # Arg given
-    if [ -n "${input}" ];then
-        if [ $(isurl "${input}") = "yes" ];then
-        
-# Supports github repo as input
-            if [ -n "$(echo "${input}" | grep github.com)" ];then
-                repo_url=${input}
-                
-# Detect https protcol
-                if [ $(echo ${input} | grep "https://github.com/*" ) ];then
-                    repo_auth="$(echo ${input} | sed 's#https://github.com##' | cut -d '/' -f2)"
-                    repo_name=`basename "$(echo ${input} | sed 's#https://github.com/##' | cut -d '/' -f3)" .git`
-                    
-# If https detected, translate to ssh
-                    if [ $(kdialog --yesno \
-    "A Kcp package should be cloned via ssh, $FUNCNAME support only ssh mode...\nShould I translate address and continue with ssh?\nRepository will be at: git@github.com/KaOS-Community-Packages/${repo_name}.git") = "0" ];then
-                        repo_url="git@github.com/KaOS-Community-Packages/${repo_name}.git"
-                        continue
-                    else exit 1
-                    fi
-            
-# Detect git protocol
-                elif [ $(echo ${input} | grep "git@github.com/*" ) ] || [ $(echo ${repo_url} | grep "git@github.com/*" ) ];then
-                    repo_auth="$(echo ${input} | sed 's#git@github.com##' | cut -d '/' -f2)"
-                    repo_name=`basename "$(echo ${input} | sed 's#git@github.com:##' | cut -d '/' -f3)" .git`
-                fi 
+if [ -n "${input}" ];then
 
-# Detect kcp address, or same user, clone repo & edit files, close this script
-                if [ "${repo_auth}" = "KaOS-Community-Packages" ] || [ "${repo_auth}" = "$(git config github.user)" ];then
-                    git clone ${repo_url} && cd ${repo_name} && $XEDITOR -n README.md PKGBUILD & exit 0
-
-                else git clone ${repo_url} && cd ${repo_name} && initgithub ${repo_name} && $XEDITOR -n README.md PKGBUILD && exit 0 || { 
-                    kdialog --error "Unable to clone given repo, is a folder named ${repo_name} exists?" 
-                    exit 1
-                    }
-                fi
-            else kdialog --title="$FUNCNAME" --error "Github.com repo not detected but url detected repo from outside github not supported for now..."
-                exit 1
-            fi
-            
+### TODO: detect url to update pkg instead of creating a new one
+    if [ "$(isurl \"${input}\")" = "yes" ];then
+        _errorexit "${input} is Url...\This is not yet implemented... Exiting..." 1
 # Arg is not an url, create new empty repo
-        elif [ -n "${input}" ]  && [ ! -d ${input}} ];then
-            if [ -n "$(echo ${input} | grep ':/')" ];then
-                kdialog --error "Protocol not supported or bad argument"
-                exit 1
-            else initgithub $1 || exit 1
-            
+    elif [ -d "${Work_dir}/${input}" ];then
+        kdialog --warningyesno "Folder exists, pull repo to ${input} folder?"
+        if [ "$?" = "0" ];then cd ${Work_dir}/${input} && git pull && exit 0 || exit 1
+        else exit 1
+        fi
+    else bash -x /usr/local/bin/initgithub "${input}" 
+        if [ "$?" = "0" ];then 
 # Get PKGBUILD proto file (hopefully pckcp takes care of this for us:)
-                pckcp -g${c} && sed -i "s/PKGNAME/${repo_name}/g" PKGBUILD
+            pckcp -g${c} && sed -i "s/PKGNAME/${repo_name}/g" PKGBUILD
             
 # Get README proto file
-                wget ${g_raw}/kaos-addict/kaos-helpers/master/README.md${_com}.kaos.proto -O README.md
-                sed -i "s/# PKGNAME/# ${repo_name}/" README.md
-                kate -n README.md PKGBUILD & disown            
-                exit 0
-            fi
-
-# Arg not detected
-        else kdialog --error "Unable to evaluate argument"
-            exit 1
+            wget ${g_raw}/kaos-addict/kaos-helpers/master/README.md${_com}.kaos.proto -O README.md
+            sed -i "s/# PKGNAME/# ${repo_name}/" README.md
+            ${XEDITOR} -n README.md PKGBUILD & disown            
+            exit 0
+        elif [ "$?" = "123" ];then
+            kdialog --msgbox "Repository ${repo_name} at https://github.com/${Org}/${repo_name} created.\nFeel free now to commit and then push your working folder: '${Work_dir}/${repo_name}'."
+        else exit 1
         fi
-        
-# No arg given
-    else kdialog --error "No arg given or ${repo_name} folder exists, exiting..."
-        exit 1
     fi
+# Arg not detected
+else kdialog --error "Unable to evaluate argument or no valid argument given."
+        exit 1
+fi
