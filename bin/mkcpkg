@@ -16,6 +16,7 @@
 #### VARIABLES: ####
 repo_name=""
 input="$1"
+g_raw="https://raw.githubusercontent.com"
 rc_file="/home/$USER/.config/mkcpkgrc"
 Org=KaOS-Community-Packages
 #### /VARIABLES: ####
@@ -23,7 +24,7 @@ Org=KaOS-Community-Packages
 #### Functions ####
 # Simple exit with error message
 _errorexit() {
-        kdialog --error $1 
+        kdialog --error "$1"
         exit $2
 }
 
@@ -55,6 +56,37 @@ get_repo() {
     return 1
 }
 
+git_init() {
+bash -x /usr/local/bin/initgithub "${input}"
+if [ "$?" = "0" ];then 
+
+# Want empty or commented?
+            kdialog --yesno "Do you want commented example files? (Best for first uses)"
+    case $? in
+        0) _com=""
+            c="c"
+        ;;
+        *) _com=".commented"
+            c=""
+        ;;
+    esac
+            
+# Get PKGBUILD proto file (hopefully pckcp takes care of this for us:)
+    rm PKGBUILD
+    pckcp -g${c} && sed -i "s/PKGNAME/${input}/g" PKGBUILD
+            
+# Get README proto file
+    wget ${g_raw}/kaos-addict/kaos-helpers/master/README.md${_com}.kaos.proto -O README.md
+    sed -i "s/# PKGNAME/# ${input}/" README.md
+    ${XEDITOR} -n README.md PKGBUILD & disown 2>>/dev/null
+    return 0
+elif [ "$?" = "123" ];then
+    kdialog --msgbox "Repository ${repo_name} at https://github.com/${Org}/${repo_name} created.\nFeel free now to commit and then push your working folder: '${Work_dir}/${repo_name}'."
+    return 0
+else return 1
+fi
+}
+
 #### /Functions ####
 
 #### Main Script ####
@@ -83,7 +115,6 @@ if [ -n "${input}" ];then
 
 # Is input an Url
     if [ "$(isurl \"${input}\")" = "yes" ];then
-<<<<<<< HEAD
 #        _errorexit "${input} is Url...\This is not yet implemented... Exiting..." 1
 
 # Supports github repo as input
@@ -101,70 +132,28 @@ if [ -n "${input}" ];then
 # Extract repo_name from url
             repo_name=`basename $(echo ${input} | sed "s#https://github.com/${Org}/##") .git`
             get_repo || _errorexit "Unable to clone and edit given repo, is a folder named '${repo_name}' existing?" 1
+        else _errorexit "Url detected but...\nNon-github repositories are not (yet) supported..." 1
         fi
-        
-    else _errorexit "Url detected but...\nNon-github repositories are not (yet) supported..." 1
     fi
 
-=======
-        _errorexit "${input} is Url...\This is not yet implemented... Exiting..." 1
-# # Supports github repo as input
-#         if [ -n "$(echo "${input}" | grep -E "github.com*.${Org}/.*")" ];then
-#             repo_url=${input}
-#             
-# # Detect https protcol
-#             if [ $(echo ${input} | grep "https://github.com/*" ) ];then
-#                     repo_auth="$(echo ${input} | sed 's#https://github.com##' | cut -d '/' -f2)"
-#                     repo_name=`basename "$(echo ${input} | sed 's#https://github.com/##' | cut -d '/' -f3)" .git`
-#                     
-# # If https detected, translate to ssh
-#                     if [ $(kdialog --yesno \
-#     "A Kcp package should be cloned via ssh, $FUNCNAME support only ssh mode...\nShould I translate address and continue with ssh?\nRepository will be at: git@github.com/KaOS-Community-Packages/${repo_name}.git") = "0" ];then
-#                         repo_url="git@github.com/KaOS-Community-Packages/${repo_name}.git"
-#                         continue
-#                     else exit 1
-#                     fi
-#             
-# # Detect git protocol
-#             elif [ $(echo ${input} | grep "git@github.com/*" ) ] || [ $(echo ${repo_url} | grep "git@github.com/*" ) ];then
-#                     repo_auth="$(echo ${input} | sed 's#git@github.com##' | cut -d '/' -f2)"
-#                     repo_name=`basename "$(echo ${input} | sed 's#git@github.com:##' | cut -d '/' -f3)" .git`
-#             fi 
-# 
-# # Detect kcp address, or same user, clone repo & edit files, close this script
-#             if [ "${repo_auth}" = "KaOS-Community-Packages" ] || [ "${repo_auth}" = "$(git config github.user)" ];then
-#                     git clone ${repo_url} && cd ${repo_name} && $XEDITOR -n README.md PKGBUILD & exit 0
-# 
-#             else git clone ${repo_url} && cd ${repo_name} && initgithub ${repo_name} && $XEDITOR -n README.md PKGBUILD && exit 0 || _errorexit "Unable to clone given repo, is a folder named '${repo_name}' existing?" 1
-#             fi
-#         else kdialog --title="$SCRIPTNAME" --error "Github.com repo not detected but url detected repo from outside github not supported for now..."
-#                 exit 1
-#         elif [ -n "$(echo ${input} | grep ':/')" ];then
-#             _errorexit "Protocol not supported or bad argument" 1
-#         
->>>>>>> Detect_url
 # Arg is not an url, create new empty repo
     if [ -d "${Work_dir}/${input}" ];then
-        kdialog --warningyesno "Folder exists, pull repo to ${input} folder?"
-        if [ "$?" = "0" ];then cd ${Work_dir}/${input} && git pull && exit 0 || exit 1
-        else exit 1
-        fi
-    else bash -x /usr/local/bin/initgithub "${input}" 
-        if [ "$?" = "0" ];then 
-# Get PKGBUILD proto file (hopefully pckcp takes care of this for us:)
-            pckcp -g${c} && sed -i "s/PKGNAME/${repo_name}/g" PKGBUILD
-            
-# Get README proto file
-            wget ${g_raw}/kaos-addict/kaos-helpers/master/README.md${_com}.kaos.proto -O README.md
-            sed -i "s/# PKGNAME/# ${repo_name}/" README.md
-            ${XEDITOR} -n README.md PKGBUILD & disown 2>>/dev/null       
-            exit 0
-        elif [ "$?" = "123" ];then
-            kdialog --msgbox "Repository ${repo_name} at https://github.com/${Org}/${repo_name} created.\nFeel free now to commit and then push your working folder: '${Work_dir}/${repo_name}'."
-        else exit 1
-        fi
+        kdialog --warningyesnocancel "Folder exists, should we delete or pull repo to ${input} folder?" --no-label "Delete" --cancel-label "Exit" --yes-label "Pull"
+        case $? in
+            0) curl -s --head https://github.com/${Org}/${input} | head -n 1 | grep "HTTP/1.[01] [23].." > /dev/null && cd ${Work_dir}/${input} && git pull && kdialog --msgbox "Repository successfully pulled in: '${Work_dir}/${input}'." && exit 0 || ${_error} "Repository does not exist... Renaming folder..."
+            mv ${Work_dir}/${input} ${Work_dir}/${input}.old
+                git_init
+        ;;
+            1) rm -rf ${Work_dir}/${input}
+                git_init
+        ;;
+            *) exit 1
+        ;;
+        esac
+    else git_init
     fi
 # Arg not detected
 else kdialog --error "Unable to evaluate argument or no valid argument given."
         exit 1
 fi
+exit 0

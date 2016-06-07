@@ -3,8 +3,6 @@
 
 rc_file="/home/$USER/.config/mkcpkgrc"
 repo_name=$1
-dir_name=`basename $(pwd)`
-g_hub="git@github.com"
 _com=".commented"
 c=${_com:1:1}
 Org=KaOS-Community-Packages
@@ -36,19 +34,17 @@ Git Status: $(git status)"
 # Get credentials from git config
     user_name=`git config github.user`
     if [ -z ${user_name} ]; then
-        kdialog --warningyesno "Could not find username from git config, should I try to configure it for you?" && user_name=$(kdialog --inputbox "Enter username you use on github (Must be member of Kaos-Community-Packages on github)" "User")
+        kdialog --warningyesno "Could not find username from git config, should I try to configure it for you?" && user_name=$(kdialog --inputbox "Enter username you use on github (Must be member of Kaos-Community-Packages on github)" "User") || exit 1
+        git config --global github.user "${user_name}"
+        
         if [ -z ${user_name} ]; then
-        ${_error} "Could not find username, to create and use one from now, run 'git config --global github.user <username>'.\n"
-        exit 1
+            _errorexit "Could not find username, to create and use one from now, run 'git config --global github.user <username>'.\n" 1
         fi
     fi
 
 # Get github token
     token=$(git config github.token)
     if [ -z ${token} ]; then
-         kdialog --warningyesno "Should I try to create you one?" 
-         if [ "$?" = "0" ];then
-            kdialog --inputbox "Enter username you want this token for (Must be member of Kaos-Community-Packages on github)" "User" || exit 1
             ${_errorexit} "Could not find token, if you didn't created one yet,\nyou can do so at: 'https://github.com/settings/tokens'\nThen you will be able to run: 'git config --global github.token <token>'"
     fi
 
@@ -99,5 +95,5 @@ Create_repo || exit 1
 git push -u origin master >> /tmp/github.${repo_name} 2>&1 || _errorexit "Unable to push repo to git@github.com:${Org}/${repo_name}.git\nYou may find out more in '/tmp/github.${repo_name}'." 1
 
 kdialog --yesno "Code pushed to remote. \nYour newly created git repository can be found at: \nhttps://github.com/${Org}/${repo_name}\nClick 'Yes' to fill basic files for a kcp package."
-    [ "$?" = "0" ] && export repo_name="${repo_name}" && exit 0 || exit 123
+[ "$?" = "0" ] && export repo_name="${repo_name}" && exit 0 || exit 123
     
