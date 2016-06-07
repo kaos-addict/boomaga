@@ -75,6 +75,40 @@ if [ -n "${input}" ];then
 ### TODO: detect url to update pkg instead of creating a new one
     if [ "$(isurl \"${input}\")" = "yes" ];then
         _errorexit "${input} is Url...\This is not yet implemented... Exiting..." 1
+# # Supports github repo as input
+#         if [ -n "$(echo "${input}" | grep -E "github.com*.${Org}/.*")" ];then
+#             repo_url=${input}
+#             
+# # Detect https protcol
+#             if [ $(echo ${input} | grep "https://github.com/*" ) ];then
+#                     repo_auth="$(echo ${input} | sed 's#https://github.com##' | cut -d '/' -f2)"
+#                     repo_name=`basename "$(echo ${input} | sed 's#https://github.com/##' | cut -d '/' -f3)" .git`
+#                     
+# # If https detected, translate to ssh
+#                     if [ $(kdialog --yesno \
+#     "A Kcp package should be cloned via ssh, $FUNCNAME support only ssh mode...\nShould I translate address and continue with ssh?\nRepository will be at: git@github.com/KaOS-Community-Packages/${repo_name}.git") = "0" ];then
+#                         repo_url="git@github.com/KaOS-Community-Packages/${repo_name}.git"
+#                         continue
+#                     else exit 1
+#                     fi
+#             
+# # Detect git protocol
+#             elif [ $(echo ${input} | grep "git@github.com/*" ) ] || [ $(echo ${repo_url} | grep "git@github.com/*" ) ];then
+#                     repo_auth="$(echo ${input} | sed 's#git@github.com##' | cut -d '/' -f2)"
+#                     repo_name=`basename "$(echo ${input} | sed 's#git@github.com:##' | cut -d '/' -f3)" .git`
+#             fi 
+# 
+# # Detect kcp address, or same user, clone repo & edit files, close this script
+#             if [ "${repo_auth}" = "KaOS-Community-Packages" ] || [ "${repo_auth}" = "$(git config github.user)" ];then
+#                     git clone ${repo_url} && cd ${repo_name} && $XEDITOR -n README.md PKGBUILD & exit 0
+# 
+#             else git clone ${repo_url} && cd ${repo_name} && initgithub ${repo_name} && $XEDITOR -n README.md PKGBUILD && exit 0 || _errorexit "Unable to clone given repo, is a folder named '${repo_name}' existing?" 1
+#             fi
+#         else kdialog --title="$SCRIPTNAME" --error "Github.com repo not detected but url detected repo from outside github not supported for now..."
+#                 exit 1
+#         elif [ -n "$(echo ${input} | grep ':/')" ];then
+#             _errorexit "Protocol not supported or bad argument" 1
+#         
 # Arg is not an url, create new empty repo
     elif [ -d "${Work_dir}/${input}" ];then
         kdialog --warningyesno "Folder exists, pull repo to ${input} folder?"
