@@ -20,9 +20,6 @@ Then run:
     * kcp -i PKGNAME
 '''
 
-#### Category
-
-
 #### From developer(s):
 
 ##### Features
@@ -31,7 +28,7 @@ Then run:
     OPTIONALLY ADD MORE DESCRIPTION INFORMATIONS HERE ETC...
 ```
 
-#### Changelog
+##### Changelog
 HTTP://CHAGELOG.URL
 
 #### Screenshot
