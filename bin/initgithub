@@ -85,6 +85,7 @@ cd ${repo_dir} || _errorexit "Unable to create or change directory to ${repo_nam
 
 # First commit
     git commit -m "Initial commit, created empty README.md and PKGBUILD files." || _errorexit "Unable to commit..." 1
+    return 0
 }
 
 Init_folder || _errorexit "Unable to create or change directory to ${repo_name}" 1

@@ -77,7 +77,7 @@ if [ "$?" = "0" ];then
             
 # Get README proto file
     wget ${g_raw}/kaos-addict/kaos-helpers/master/README.md${_com}.kaos.proto -O README.md
-    sed -i "s/# PKGNAME/# ${input}/" README.md
+    sed -i "s/# PKGNAME/# ${input}/g" README.md
     ${XEDITOR} -n README.md PKGBUILD & disown 2>>/dev/null
     return 0
 elif [ "$?" = "123" ];then
